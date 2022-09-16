@@ -7,6 +7,7 @@ import time
 import random
 import numpy as np
 import wandb
+from timm import create_model
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -48,8 +49,10 @@ def parse_option():
 
     # model
     parser.add_argument('--model', type=str, default=None,
-                        choices=['rn50', 'instagram_resnext101_32x8d', 'bit_m_rn50'],
+                        choices=['rn50', 'instagram_resnext101_32x8d', 'bit_m_rn50','rn50-robust-eps8'],
                         help='choose pre-trained model')
+    parser.add_argument('--model_path', type=str, default='',
+                        help='path of the pretrained model')
     parser.add_argument('--method', type=str, default='padding',
                         choices=['padding', 'random_patch', 'fixed_patch'],
                         help='choose visual prompting method')
@@ -82,7 +85,7 @@ def parse_option():
                         help='evaluate model test set')
     parser.add_argument('--gpu', type=int, default=None,
                         help='gpu to use')
-    parser.add_argument('--use_wandb', default=False,
+    parser.add_argument('--use_wandb', default=True,
                         action="store_true",
                         help='whether to use wandb')
 
@@ -127,7 +130,12 @@ def main():
         model = bit_models.KNOWN_MODELS['BiT-M-R50x1'](zero_head=True)
         model.load_from(np.load('BiT-M-R50x1.npz'))
         model = model.to(device)
-
+    elif args.model == 'rn50-robust-eps8':
+        model = create_model('resnet50',pretrained = False)
+        assert args.model_path!=''
+        ckpt = torch.load(args.model_path)
+        model.load_state_dict(ckpt['state_dict'],strict = True)
+        model = model.to(device)
     model.eval()
 
     prompter = prompters.__dict__[args.method](args).to(device)
